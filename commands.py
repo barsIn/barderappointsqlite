@@ -311,6 +311,7 @@ def get_next_apoint(user_id):
     workday = get_next_workday(now)
     appoints = get_date_appoint(workday.strftime('%Y-%m-%d'))
     nowtime = datetime.strptime(datetime.now().strftime('%H:%M:%S'), '%H:%M:%S')
+    aptime = nowtime
     starttime = get_worktime_sql()[0]
     endtime = get_worktime_sql()[1]
     if not appoints and now != workday:
@@ -323,15 +324,14 @@ def get_next_apoint(user_id):
             aptime = f'{nowhour+1}:00:00'
     else:
         aptime1 = get_free_times(appoints)
-        aptime = []
-        nowtime = datetime.now().hour
-        for t in aptime1:
-            if int(t[0:2]) > nowtime:
-                aptime.append(t)
-        try:
-            aptime = aptime[0]
-        except:
-            aptime = ['23:00:00']
+        if now != workday:
+            aptime = aptime1[0]
+        else:
+            nowtime = datetime.now().hour
+            for t in aptime1:
+                if int(t[0:2]) > nowtime:
+                    aptime = t
+                    break
     return [workday, aptime]
 
 
@@ -418,5 +418,3 @@ def check_number(number, max):
         return False
 
 
-text = 'Bujhm 982'
-text = t

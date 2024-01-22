@@ -432,8 +432,8 @@ def deletesometh():
         # cur.execute("DROP TABLE holydays")
         # cur.execute("DROP TABLE worktime")
         # cur.execute("DROP TABLE adms")
-        # cur.execute("DROP TABLE users")
-        # cur.execute("DROP TABLE appoints")
+        cur.execute("DROP TABLE users")
+        cur.execute("DROP TABLE appoints")
         cur.execute("DROP TABLE current_appoints")
 
 # deletesometh()

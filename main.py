@@ -385,6 +385,7 @@ def name_reqest(message):
 def get_next_apoint_user(message):
     user_id = message.from_user.id
     next_time = get_next_apoint(user_id)
+    print(f'Следующая запись {next_time}')
     kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
     button1 = types.KeyboardButton('Да')
     button2 = types.KeyboardButton('Нет')
