@@ -84,7 +84,7 @@ def get_next_appoint():
                             JOIN users ON appoints.user_id=users.user_id
                             WHERE appoints.date >= date('{date1}') ORDER BY appoints.date, start_time""")
         result = cur.fetchone()
-    if len(result) > 0:
+    if result:
         return result
     else:
         return False
@@ -349,7 +349,8 @@ def get_my_appoint_sql(user_id):
     create_appoints()
     with sq.connect(db_name) as con:
         cur = con.cursor()
-        cur.execute(f"""SELECT date, start_time FROM appoints WHERE user_id == {user_id}""")
+        cur.execute(f"""SELECT date, start_time FROM appoints WHERE user_id == {user_id}
+                        ORDER BY date, start_time""")
         result = cur.fetchone()
         return result
 
@@ -358,7 +359,8 @@ def get_my_appoint_with_id_sql(user_id):
     create_appoints()
     with sq.connect(db_name) as con:
         cur = con.cursor()
-        cur.execute(f"""SELECT appoint_id, date, start_time FROM appoints WHERE user_id == {user_id}""")
+        cur.execute(f"""SELECT appoint_id, date, start_time FROM appoints WHERE user_id == {user_id}
+                        ORDER BY date, start_time""")
         result = cur.fetchall()
         return result
 

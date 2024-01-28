@@ -1,3 +1,4 @@
+import re
 from datetime import date, time, datetime, timedelta
 import random
 from sqlcommands import (get_next_appoint, get_date_appoint, remuve_weekday, add_weekday, get_weekendssql, get_holydays_sql,
@@ -42,10 +43,34 @@ months = {
 
 def date_check(datestr):
     try:
-        datetime.strptime(datestr, '%d.%m.%Y')
-        return datetime.strptime(datestr, '%d.%m.%Y')
+        thisday = datetime.strptime(datestr, '%d.%m.%Y')
+        return thisday
     except:
-        return False
+        # days = datestr.split('/', '.', ',',':',';',' ')
+        days = re.split("[.,:;]", datestr)
+        print(f'days {days}')
+        print(len(days))
+        if len(days) == 2:
+            try:
+                thisday = int(days[0])
+                thismonth = int(days[1])
+                thisyear = datetime.today().year
+                thisdate = datetime(thisyear, thismonth, thisday)
+                print(thisdate)
+                return thisdate
+            except:
+                return False
+        elif len(days) == 3:
+            try:
+                thisday = int(days[0])
+                thismonth = int(days[1])
+                thisyear = int(days[2])
+                thisdate = datetime(thisyear, thismonth, thisday)
+                return thisdate
+            except:
+                return False
+        else:
+            return False
 
 
 def chek_next_appoint_adm():

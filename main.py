@@ -3,6 +3,7 @@ import telebot
 from datetime import datetime, date, timedelta
 from telebot import types
 from dotenv import load_dotenv
+import schedule
 
 from messegetext import (greatings, admgreatings, usergrbt1, usergrbt2, usergrbt3, usergrbt4, usergrbt5, admgrbt1, admgrbt2,
                          admgrbt3, admgrbt4, admgrbt5, cancel, unknoun, contact_reqest_text, admgrbt6)
@@ -190,16 +191,20 @@ def client_appoint_byadm(message):
 def client_date(message):
     text = message.text
     text = text.split()
-    name, telephone = text[0], text[1]
-    user_id = create_user_byadm(name, telephone)
-    kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
-    button1 = types.KeyboardButton('Сегодня')
-    button2 = types.KeyboardButton('Завтра')
-    button3 = types.KeyboardButton('Другая дата')
-    kb1.add(button1, button2, button3)
-    text1 = f'На какую дату осуществить запись?'
-    msg = bot.send_message(message.chat.id, text1)
-    bot.register_next_step_handler(msg, check_client_day, user_id)
+    try:
+        name, telephone = text[0], text[1]
+        user_id = create_user_byadm(name, telephone)
+        kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
+        button1 = types.KeyboardButton('Сегодня')
+        button2 = types.KeyboardButton('Завтра')
+        button3 = types.KeyboardButton('Другая дата')
+        kb1.add(button1, button2, button3)
+        text1 = f'На какую дату осуществить запись?'
+        msg = bot.send_message(message.chat.id, text1, reply_markup=kb1)
+        bot.register_next_step_handler(msg, check_client_day, user_id)
+    except:
+        bot.send_message(message.chat.id, 'Введи через пробел имя и телефон')
+        client_appoint_byadm(message)
 
 
 def check_client_day(message, user_id):
@@ -662,6 +667,9 @@ def delete_apoint_user(message):
     user_id = message.from_user.id
     appoints = get_my_appoint_with_id_sql(user_id)
     if len(appoints) > 1:
+        kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=1, resize_keyboard=True, )
+        button1 = types.KeyboardButton('Отмена')
+        kb1.add(button1)
         text = f'У вас сейчас {len(appoints)} записей'
         count = 1
         for appoint in appoints:
@@ -670,7 +678,7 @@ def delete_apoint_user(message):
             text = f'{text} \n{count} На {day} в {time1}'
             count += 1
         text = text + '\nДля удаления введите порядковый номер записи'
-        msg = bot.reply_to(message, text)
+        msg = bot.reply_to(message, text, reply_markup=kb1)
         bot.register_next_step_handler(msg,  choose_deleted, appoints)
 
     elif len(appoints) == 1:
@@ -696,13 +704,16 @@ def choose_deleted(message, appoints):
     user_id = message.from_user.id
     text = message.text
     num = check_number(text, len(appoints))
-    if num:
-        delete_appoint_id(appoints[num-1][0])
-        bot.send_message(message.chat.id, 'Запись успешно удалена')
+    if text in cancel:
         starting(message)
     else:
-        bot.send_message(message.chat.id, 'Некорректно указан номер записи')
-        delete_apoint_user(message)
+        if num:
+            delete_appoint_id(appoints[num-1][0])
+            bot.send_message(message.chat.id, 'Запись успешно удалена')
+            starting(message)
+        else:
+            bot.send_message(message.chat.id, 'Некорректно указан номер записи')
+            delete_apoint_user(message)
 
 
 @bot.message_handler(func=lambda message: True)
@@ -724,8 +735,11 @@ def send_any(message):
     else:
         bot.send_message(message.chat.id, text)
 
-# Дальше идут команды для знакомства с юзером
 
+def todayapoits_auto():
+    usrer = my_user_id[0]
+    text = chek_todayadmcmd()
+    bot.send_message(usrer, text)
 
-
+schedule.every().day.at('12:41').do(todayapoits_auto)
 bot.infinity_polling()
