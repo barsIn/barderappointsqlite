@@ -4,6 +4,7 @@ from datetime import datetime, date, timedelta
 from telebot import types
 from dotenv import load_dotenv
 import schedule
+import threading
 
 from messegetext import (greatings, admgreatings, usergrbt1, usergrbt2, usergrbt3, usergrbt4, usergrbt5, admgrbt1, admgrbt2,
                          admgrbt3, admgrbt4, admgrbt5, cancel, unknoun, contact_reqest_text, admgrbt6)
@@ -741,5 +742,32 @@ def todayapoits_auto():
     text = chek_todayadmcmd()
     bot.send_message(usrer, text)
 
-schedule.every().day.at('12:41').do(todayapoits_auto)
-bot.infinity_polling()
+
+def my_schedule1():
+    schedule.every().day.at('07:00').do(todayapoits_auto)
+    schedule.every(1).minutes.do(todayapoits_auto)
+    while True:
+        try:
+            schedule.run_pending()
+        except Exception as e:
+            print(e)
+
+
+def my_bot():
+    while True:
+        try:
+            bot.polling()
+            print('Hi there')
+        except Exception as e:
+            print(e)
+
+
+def main():
+    th1 = threading.Thread(target=my_bot)
+    th2 = threading.Thread(target=my_schedule1)
+    th1.start()
+    th2.start()
+
+if __name__ == "__main__":
+    main()
+
