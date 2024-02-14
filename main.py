@@ -13,11 +13,11 @@ from commands import (chek_next_appoint_adm, chek_todayadmcmd, chek_tomorrowadmc
                       holyday_check, get_holydays_adm, get_worktime_adm, worktime_check, create_user, update_user, get_next_apoint,
                       make_current_appoint, chek_day_appoit_user, time_check, get_app_times, get_my_appoint,
                       get_user_data, make_change_user_data, check_number, create_user_byadm, get_black_list_all,
-                      search_by_telephon, search_by_name)
+                      search_by_telephon, search_by_name, search_by_appoint)
 from sqlcommands import (get_adms, set_adms, remove_adms, get_usersid_sql, create_current_appoint, update_current_appoint_type,
                          delete_current, get_current_date, update_current_appoint_time, delete_appoint,
                          get_my_appoint_with_id_sql, delete_appoint_id, remove_from_black_list, add_to_black_list,
-                         get_id_from_black_list)
+                         get_id_from_black_list, clear_current)
 
 
 # my_user_id = []
@@ -27,7 +27,7 @@ load_dotenv()
 
 API_TOKEN = os.getenv('API_TOKEN')
 bot = telebot.TeleBot(API_TOKEN)
-
+clear_current()
 @bot.message_handler(commands=['start'])
 def starting(message):
     if message.from_user.id in my_user_id:
@@ -334,7 +334,7 @@ def new_user(message):
     kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=1, resize_keyboard=True, )
     button1 = types.KeyboardButton('Передать телефон 📞', request_contact=True)
     button2 = types.KeyboardButton('Отмена', request_contact=True)
-    kb1.add(button1,button2)
+    kb1.add(button1, button2)
     msg = bot.send_message(message.chat.id, text, reply_markup=kb1)
     bot.register_next_step_handler(msg, contact_reqest)
 
@@ -401,17 +401,22 @@ def get_next_apoint_user(message):
     else:
         user_id = message.from_user.id
         next_time = get_next_apoint(user_id)
-        print(f'Следующая запись {next_time}')
-        kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
-        button1 = types.KeyboardButton('Да')
-        button2 = types.KeyboardButton('Нет')
-        kb1.add(button1, button2)
-        create_current_appoint(user_id, next_time[0], next_time[1])
-        apdate = next_time[0].strftime('%d.%m.%Y')
-        aptime = datetime.strptime(next_time[1], '%H:%M:%S').strftime('%H:%M')
-        text = f'Следующая свободная дата для записи {apdate}, в {next_time[1]}\nОсуществить запись?'
-        msg = bot.send_message(message.chat.id, text, reply_markup=kb1)
-        bot.register_next_step_handler(msg, answer_current_appont)
+        print(f'Следующая возможная запись {next_time}')
+        if len(get_my_appoint_with_id_sql(message.from_user.id)) >= 2:
+            answer = 'Нельзя осуществлять больше двух записей, сперва удалите одну'
+            bot.send_message(message.chat.id, answer)
+            starting(message)
+        else:
+            kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
+            button1 = types.KeyboardButton('Да')
+            button2 = types.KeyboardButton('Нет')
+            kb1.add(button1, button2)
+            create_current_appoint(user_id, next_time[0], next_time[1])
+            apdate = next_time[0].strftime('%d.%m.%Y')
+            aptime = datetime.strptime(next_time[1], '%H:%M:%S').strftime('%H:%M')
+            text = f'Следующая свободная дата для записи {apdate}, в {next_time[1]}\nОсуществить запись?'
+            msg = bot.send_message(message.chat.id, text, reply_markup=kb1)
+            bot.register_next_step_handler(msg, answer_current_appont)
 
 
 def answer_current_appont(message):
@@ -435,13 +440,18 @@ def answer_current_appont(message):
 
 
 def finish_current_appont(message):
-    answer = message.text
-    user_id = message.from_user.id
-    update_current_appoint_type(user_id, answer)
-    text = make_current_appoint(user_id)
-    bot.send_message(message.chat.id, text)
-    time.sleep(2)
-    starting(message)
+    if len(get_my_appoint_with_id_sql(message.from_user.id)) >= 2:
+        answer = 'Нельзя осуществлять больше двух записей, сперва удалите одну'
+        bot.send_message(message.chat.id, answer)
+        starting(message)
+    else:
+        answer = message.text
+        user_id = message.from_user.id
+        update_current_appoint_type(user_id, answer)
+        text = make_current_appoint(user_id)
+        bot.send_message(message.chat.id, text)
+        time.sleep(2)
+        starting(message)
 
 
 @bot.message_handler(func=lambda message: message.text == usergrbt6)
@@ -583,35 +593,40 @@ def check_day_user(message):
 
 
 def start_appoint(message, date1, daytext):
-    user_id = message.from_user.id
-    text = message.text
-    daytext = daytext
-    day2 = date1.strftime('%d.%m.%Y')
-    is_work, workday, days = chek_day_appoit_user(user_id, date1)
-    workdaystr = workday.strftime('%d.%m.%Y')
-    times = get_app_times(workday)
-    kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
-    button1 = types.KeyboardButton('Выбрать другой день')
-    button2 = types.KeyboardButton('Отмена')
-    kb1.add(button1, button2)
-    if is_work:
-        if len(times) == 0:
-            text = f'На {daytext} нет свободного времени'
-        else:
-            text = f'На {daytext} свободно следующее время:\n'
-            for i in times:
-                text = text + f'{i}\n'
-            text = text + 'Записаться на свободное время, введи его в формате ЧЧ:ММ\nЛибо введи отмена'
+    if len(get_my_appoint_with_id_sql(message.from_user.id)) >= 2:
+        answer = 'Нельзя осуществлять больше двух записей, сперва удалите одну'
+        bot.send_message(message.chat.id, answer)
+        starting(message)
     else:
-        if len(times) == 0:
-            text = f'{day2} выходной, следующий рабочий день {workdaystr} но к сожалению свободного времени на эту дату нет'
+        user_id = message.from_user.id
+        text = message.text
+        daytext = daytext
+        day2 = date1.strftime('%d.%m.%Y')
+        is_work, workday, days = chek_day_appoit_user(user_id, date1)
+        workdaystr = workday.strftime('%d.%m.%Y')
+        times = get_app_times(workday)
+        kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
+        button1 = types.KeyboardButton('Выбрать другой день')
+        button2 = types.KeyboardButton('Отмена')
+        kb1.add(button1, button2)
+        if is_work:
+            if len(times) == 0:
+                text = f'На {daytext} нет свободного времени'
+            else:
+                text = f'На {daytext} свободно следующее время:\n'
+                for i in times:
+                    text = text + f'{i}\n'
+                text = text + 'Записаться на свободное время, введи его в формате ЧЧ:ММ\nЛибо введи отмена'
         else:
-            text = f'{day2} выходной, можно записаться на {workdaystr} свободно следующее время:\n'
-            for i in times:
-                text = text + f'{i}\n'
-            text = text + 'Записаться на свободное время, введи его в формате ЧЧ:ММ\nЛибо введи отмена'
-    msg = bot.send_message(message.chat.id, text, reply_markup=kb1)
-    bot.register_next_step_handler(msg, check_time_user)
+            if len(times) == 0:
+                text = f'{day2} выходной, следующий рабочий день {workdaystr} но к сожалению свободного времени на эту дату нет'
+            else:
+                text = f'{day2} выходной, можно записаться на {workdaystr} свободно следующее время:\n'
+                for i in times:
+                    text = text + f'{i}\n'
+                text = text + 'Записаться на свободное время, введи его в формате ЧЧ:ММ\nЛибо введи отмена'
+        msg = bot.send_message(message.chat.id, text, reply_markup=kb1)
+        bot.register_next_step_handler(msg, check_time_user)
 
 
 @bot.message_handler(func=lambda message: message.text == usergrbt4)
@@ -814,6 +829,7 @@ def black_list_second(message):
         msg = bot.send_message(message.chat.id, text)
         bot.register_next_step_handler(msg, black_list_start)
 
+
 def delete_from_black_list(message):
     text = message.text
     if text in cancel:
@@ -875,6 +891,10 @@ def add_to_black_list_second(message):
             answer = 'Введи имя'
             msg = bot.reply_to(message, answer)
             bot.register_next_step_handler(msg, user_search_by_name)
+        elif text == 'По записи':
+            answer = 'Введи дату'
+            msg = bot.reply_to(message, answer)
+            bot.register_next_step_handler(msg, user_search_by_appoint_second)
 
 
 def user_search_by_telephon(message):
@@ -894,14 +914,43 @@ def user_search_by_telephon(message):
 
 def user_search_by_name(message):
     text = message.text
-    answertext = search_by_name(text)
-    if answertext:
-        bot.reply_to(message, answertext)
+    if text in cancel:
         black_list_start(message)
     else:
-        answer = 'Неверный номер телефона, введи другой'
-        msg = bot.reply_to(message, answertext)
-        bot.register_next_step_handler(msg, user_search_by_telephon)
+        answertext = search_by_name(text)
+        if answertext:
+            bot.reply_to(message, answertext)
+            black_list_start(message)
+        else:
+            answer = 'Нет пользователей с таким именем'
+            msg = bot.reply_to(message, answer)
+            bot.register_next_step_handler(msg, user_search_by_telephon)
+
+
+def user_search_by_appoint(message):
+    text = message.text
+    if text in cancel:
+        black_list_start(message)
+    else:
+        answer = 'Введи дату за которую хочешь посмотреть клиентов'
+        msg = bot.reply_to(message, answer)
+        bot.register_next_step_handler(msg, user_search_by_appoint_second)
+
+
+
+def user_search_by_appoint_second(message):
+    text = message.text
+    if text in cancel:
+        black_list_start(message)
+    else:
+        answer = search_by_appoint(text)
+        if answer:
+            bot.reply_to(message, answer)
+            black_list_start(message)
+        else:
+            answer = 'Неверный формат датыб либо в эту дату ни кто не записался'
+            bot.reply_to(message, answer)
+            user_search_by_appoint(message)
 
 
 @bot.message_handler(func=lambda message: True)
@@ -924,6 +973,7 @@ def todayapoits_auto():
 
 def my_schedule1():
     schedule.every().day.at('07:00').do(todayapoits_auto)
+    schedule.every().day.at('07:00').do(clear_current)
     while True:
         try:
             schedule.run_pending()

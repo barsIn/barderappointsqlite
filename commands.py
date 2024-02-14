@@ -5,7 +5,8 @@ from sqlcommands import (get_next_appoint, get_date_appoint, remuve_weekday, add
                          add_holyday_sql, dalete_holyday_sql, get_worktime_sql, set_worktime, update_worktime, add_user,
                          update_user_sql, create_current_appoint, add_appoint, get_current_appoint, delete_current,
                          get_my_appoint_sql, get_user_data_sql, chenge_user_data_sql, chenge_user_telephone_sql,
-                         delete_erliiest, get_users_from_black_list, get_users_by_tel_sql, get_users_by_name_sql)
+                         delete_erliiest, get_users_from_black_list, get_users_by_tel_sql, get_users_by_name_sql,
+                         get_all_appoints, get_user_by_id)
 
 weekdays = {
     'Mon': 'Понедельник',
@@ -418,7 +419,6 @@ def get_my_appoint(user_id):
     else:
         return False
 
-
 def get_user_data(user_id):
     user = get_user_data_sql(user_id)
     if user:
@@ -484,4 +484,24 @@ def search_by_name(name):
     else:
         return False
 
-print(search_by_name('vasya'))
+
+
+def search_by_appoint(apdate):
+    delete_erliiest()
+    result = []
+    newdate = date_check(apdate)
+    if not newdate:
+        return False
+    appoints = list(set(get_all_appoints(newdate)))
+    appoints.sort(key=lambda x: x[1])
+    if appoints:
+        text = f'{apdate} было {len(appoints)} записей\n'
+        for app in appoints:
+            user = get_user_by_id(app[0])
+            text += f'в {app[1][0:5]} приходил {user[2]}, телефон {user[1]}, id: {user[0]}\n'
+        return text
+    else:
+        return False
+
+
+

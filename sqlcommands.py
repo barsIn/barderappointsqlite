@@ -319,6 +319,12 @@ def delete_current(user_id):
         cur.execute(f"DELETE FROM current_appoints WHERE user_id == {user_id}")
 
 
+def clear_current():
+    with sq.connect(db_name) as con:
+        cur = con.cursor()
+        cur.execute(f"DELETE FROM current_appoints")
+
+
 def update_user_sql(user_id, user_name):
     create_users()
     with sq.connect(db_name) as con:
@@ -394,7 +400,6 @@ def get_my_appoint_with_id_sql(user_id):
                         ORDER BY date, start_time""")
         result = cur.fetchall()
         return result
-
 
 def delete_appoint(user_id):
     with sq.connect(db_name) as con:
@@ -492,6 +497,7 @@ def add_to_black_list(user_id):
     else:
         return False
 
+
 def get_id_from_black_list():
     with sq.connect(db_name) as con:
         cur = con.cursor()
@@ -501,6 +507,7 @@ def get_id_from_black_list():
         for el in res:
             result.append(el[0])
         return result
+
 
 def get_users_from_black_list():
     with sq.connect(db_name) as con:
@@ -545,6 +552,21 @@ def get_users_by_name_sql(name: str):
     except Exception as e:
         print(e)
         return False
+
+
+def get_all_appoints(date):
+    try:
+        with sq.connect(db2_name) as con:
+            cur = con.cursor()
+            cur.execute(f"""SELECT user_id, start_time FROM appoints 
+                        WHERE date == date('{date}')
+                        ORDER BY start_time""")
+            result = cur.fetchall()
+            return result
+    except Exception as e:
+        print(e)
+        return False
+
 
 
 def remove_adms(user_id):
