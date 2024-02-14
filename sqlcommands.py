@@ -6,6 +6,7 @@ from datetime import timedelta
 # from main import my_user_id
 
 db_name = 'main_barber.db'
+db2_name = 'second_appoints'
 weekdays = {
     'Mon': 1,
     'Tue': 2,
@@ -17,6 +18,19 @@ weekdays = {
 }
 def create_appoints():
     with sq.connect(db_name) as con:
+        cur = con.cursor()
+        cur.execute("""CREATE TABLE IF NOT EXISTS appoints (
+            appoint_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            finish_time TEXT NOT NULL,
+            barber_type TEXT
+        )""")
+
+
+def create_second_appoints():
+    with sq.connect(db2_name) as con:
         cur = con.cursor()
         cur.execute("""CREATE TABLE IF NOT EXISTS appoints (
             appoint_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,6 +88,17 @@ def create_users():
             telephone TEXT NOT NULL DEFAULT 'Heve not telephone',
             user_name TEXT
         )""")
+
+def create_black_list():
+    with sq.connect(db_name) as con:
+        cur = con.cursor()
+        cur.execute("""CREATE TABLE IF NOT EXISTS black_list (
+            user_id INTEGER PRIMARY KEY,
+            telephone TEXT NOT NULL DEFAULT 'Heve not telephone',
+            user_name TEXT
+        )""")
+
+
 def get_next_appoint():
     create_appoints()
     create_users()
@@ -149,6 +174,7 @@ def delet_erlist():
         except Exception as e:
             print(e)
             return False
+
 
 def get_holydays_sql():
     create_holydays()
@@ -233,6 +259,7 @@ def get_usersid_sql():
             id.append(i[0])
     return id
 
+
 def add_user(user_id, telephone, user_name):
     create_users()
     with sq.connect(db_name) as con:
@@ -276,6 +303,7 @@ def update_current_appoint_time(user_id, time1):
 # add_user(2, '963', 'test')
 # add_user(3, '915', 'Pasha')
 
+
 def get_current_appoint(user_id):
     with sq.connect(db_name) as con:
         cur = con.cursor()
@@ -289,6 +317,7 @@ def delete_current(user_id):
     with sq.connect(db_name) as con:
         cur = con.cursor()
         cur.execute(f"DELETE FROM current_appoints WHERE user_id == {user_id}")
+
 
 def update_user_sql(user_id, user_name):
     create_users()
@@ -305,6 +334,8 @@ def add_appoint(appoint):
                         VALUES('{appoint[0]}', date('{appoint[1]}'), time('{appoint[2]}'), time('{appoint[3]}'), '{appoint[4]}')""")
 
 # add_appoint([2,'2024-01-22', '10:00:00', '10:59:00', 'boroda'])
+
+
 def get_current_date(user_id):
     create_appoints()
     with sq.connect(db_name) as con:
@@ -401,12 +432,23 @@ def delete_erliiest():
     now = dt.datetime.now()
     with sq.connect(db_name) as con:
         cur = con.cursor()
+        cur.execute(f"""SELECT * FROM appoints""")
+        result = cur.fetchall()
+    create_second_appoints()
+    if result:
+        with sq.connect(db2_name) as con:
+            cur = con.cursor()
+            for appoint in result:
+                cur.execute(f"""INSERT INTO appoints (user_id, date, start_time, finish_time, barber_type) 
+                                        VALUES('{appoint[1]}', date('{appoint[2]}'), time('{appoint[3]}'), time('{appoint[4]}'), '{appoint[5]}')""")
+            cur.execute(f"""SELECT * FROM appoints""")
+    with sq.connect(db_name) as con:
+        cur = con.cursor()
         date1 = dt.date.today().strftime('%Y-%m-%d')
         cur.execute(f"""DELETE FROM appoints 
                     WHERE appoints.date <= date('{now}')""")
         result = cur.fetchall()
         return result
-
 
 
 
@@ -420,6 +462,90 @@ def set_adms(id, my_user_id):
             return my_user_id
         except Exception as e:
             print(e)
+
+
+def get_user_by_id(id):
+    try:
+        with sq.connect(db_name) as con:
+            cur = con.cursor()
+            cur.execute(f"""SELECT telephone, user_name FROM users 
+                        WHERE user_id=={id}""")
+            result = cur.fetchone()
+            return id, result[0], result[1]
+    except Exception:
+        return False
+
+
+def add_to_black_list(user_id):
+    create_black_list()
+    user = get_user_by_id(user_id)
+    if user:
+        id, name, tel = user
+        with sq.connect(db_name) as con:
+            cur = con.cursor()
+            try:
+                cur.execute(f"""INSERT INTO black_list VALUES('{id}', '{tel}', '{name}')""")
+                return True
+            except Exception as e:
+                print(e)
+                return False
+    else:
+        return False
+
+def get_id_from_black_list():
+    with sq.connect(db_name) as con:
+        cur = con.cursor()
+        cur.execute(f'SELECT user_id FROM black_list')
+        res = cur.fetchall()
+        result = []
+        for el in res:
+            result.append(el[0])
+        return result
+
+def get_users_from_black_list():
+    with sq.connect(db_name) as con:
+        cur = con.cursor()
+        cur.execute(f'SELECT user_id, user_name, telephone FROM black_list')
+        res = cur.fetchall()
+        return res
+
+
+def remove_from_black_list(id):
+    with sq.connect(db_name) as con:
+        cur = con.cursor()
+        try:
+            cur.execute(f'DELETE FROM black_list WHERE user_id == {id}')
+        except Exception as e:
+            print(e)
+
+
+def get_users_by_tel_sql(tel):
+    telephon1 = f'+7{tel}'
+    telephon2 = f'8{tel}'
+    try:
+        with sq.connect(db_name) as con:
+            cur = con.cursor()
+            cur.execute(f"""SELECT user_id, user_name FROM users 
+                        WHERE telephone == '{telephon1}' OR telephone == '{telephon2}'""")
+            result = cur.fetchone()
+            return result[0], result[1]
+    except Exception as e:
+        print(e)
+        return False
+
+
+def get_users_by_name_sql(name: str):
+    try:
+        with sq.connect(db_name) as con:
+            cur = con.cursor()
+            cur.execute(f"""SELECT user_id, telephone FROM users 
+                        WHERE user_name == '{name}' OR user_name == '{name.title()}'""")
+            result = cur.fetchall()
+            return result
+    except Exception as e:
+        print(e)
+        return False
+
 
 def remove_adms(user_id):
     with sq.connect(db_name) as con:
@@ -439,3 +565,6 @@ def deletesometh():
         cur.execute("DROP TABLE current_appoints")
 
 # deletesometh()
+# [(10, 645861858, '2024-02-15', '12:00:00', '12:59:00', 'Стрижка'),
+# (13, 353034106, '2024-02-15', '13:00:00', '13:59:00', 'Стрижка'),
+# (14, 353034106, '2024-02-15', '15:00:00', '15:59:00', 'Комплекс')]

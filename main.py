@@ -6,15 +6,18 @@ from dotenv import load_dotenv
 import schedule
 import threading
 
+import messegetext
 from messegetext import (greatings, admgreatings, usergrbt1, usergrbt2, usergrbt3, usergrbt4, usergrbt5, admgrbt1, admgrbt2,
-                         admgrbt3, admgrbt4, admgrbt5, cancel, unknoun, contact_reqest_text, admgrbt6)
+                         admgrbt3, admgrbt4, admgrbt5, cancel, unknoun, contact_reqest_text, admgrbt6, usergrbt6)
 from commands import (chek_next_appoint_adm, chek_todayadmcmd, chek_tomorrowadmcmd, date_check, chek_alldaymcmd, get_weekends_adm, weekdate_check,
                       holyday_check, get_holydays_adm, get_worktime_adm, worktime_check, create_user, update_user, get_next_apoint,
                       make_current_appoint, chek_day_appoit_user, time_check, get_app_times, get_my_appoint,
-                      get_user_data, make_change_user_data, check_number, create_user_byadm)
+                      get_user_data, make_change_user_data, check_number, create_user_byadm, get_black_list_all,
+                      search_by_telephon, search_by_name)
 from sqlcommands import (get_adms, set_adms, remove_adms, get_usersid_sql, create_current_appoint, update_current_appoint_type,
                          delete_current, get_current_date, update_current_appoint_time, delete_appoint,
-                         get_my_appoint_with_id_sql, delete_appoint_id)
+                         get_my_appoint_with_id_sql, delete_appoint_id, remove_from_black_list, add_to_black_list,
+                         get_id_from_black_list)
 
 
 # my_user_id = []
@@ -44,7 +47,8 @@ def starting(message):
         button3 = types.KeyboardButton(usergrbt4)
         button4 = types.KeyboardButton(usergrbt5)
         button5 = types.KeyboardButton(usergrbt2)
-        kb1.add(button1, button2, button3, button4, button5)
+        button6 = types.KeyboardButton(usergrbt6)
+        kb1.add(button1, button2, button3, button4, button5, button6)
         bot.send_message(message.chat.id, greatings, reply_markup=kb1)
 
 
@@ -83,6 +87,7 @@ def chek_tomorrowadm(message):
     bot.send_message(message.chat.id, text)
     time.sleep(3)
     starting(message)
+
 
 # ввод даты после которого последует проверка корректности
 @bot.message_handler(func=lambda message: message.text == 'Другая дата' and message.from_user.id in my_user_id)
@@ -389,19 +394,24 @@ def name_reqest(message):
 
 @bot.message_handler(func=lambda message: message.text == usergrbt1)
 def get_next_apoint_user(message):
-    user_id = message.from_user.id
-    next_time = get_next_apoint(user_id)
-    print(f'Следующая запись {next_time}')
-    kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
-    button1 = types.KeyboardButton('Да')
-    button2 = types.KeyboardButton('Нет')
-    kb1.add(button1, button2)
-    create_current_appoint(user_id, next_time[0], next_time[1])
-    apdate = next_time[0].strftime('%d.%m.%Y')
-    aptime = datetime.strptime(next_time[1], '%H:%M:%S').strftime('%H:%M')
-    text = f'Следующая свободная дата для записи {apdate}, в {next_time[1]}\nОсуществить запись?'
-    msg = bot.send_message(message.chat.id, text, reply_markup=kb1)
-    bot.register_next_step_handler(msg, answer_current_appont)
+    if message.chat.id in get_id_from_black_list():
+        text = 'Вы в черном списке, обратитесь к администратору'
+        bot.reply_to(message, text)
+        starting(message)
+    else:
+        user_id = message.from_user.id
+        next_time = get_next_apoint(user_id)
+        print(f'Следующая запись {next_time}')
+        kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
+        button1 = types.KeyboardButton('Да')
+        button2 = types.KeyboardButton('Нет')
+        kb1.add(button1, button2)
+        create_current_appoint(user_id, next_time[0], next_time[1])
+        apdate = next_time[0].strftime('%d.%m.%Y')
+        aptime = datetime.strptime(next_time[1], '%H:%M:%S').strftime('%H:%M')
+        text = f'Следующая свободная дата для записи {apdate}, в {next_time[1]}\nОсуществить запись?'
+        msg = bot.send_message(message.chat.id, text, reply_markup=kb1)
+        bot.register_next_step_handler(msg, answer_current_appont)
 
 
 def answer_current_appont(message):
@@ -434,24 +444,43 @@ def finish_current_appont(message):
     starting(message)
 
 
+@bot.message_handler(func=lambda message: message.text == usergrbt6)
+def make_apoint_user(message):
+    # Вывод прайса
+    user_id = message.from_user.id
+    text = messegetext.price_text
+    bot.send_message(message.chat.id, text)
+    time.sleep(2)
+    starting(message)
+
 @bot.message_handler(func=lambda message: message.text == usergrbt3)
 def make_apoint_user(message):
-    user_id = message.from_user.id
-    text = 'Какой день интересует?'
-    kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
-    button1 = types.KeyboardButton('Сегодня')
-    button2 = types.KeyboardButton('Завтра')
-    button3 = types.KeyboardButton('Другая дата')
-    kb1.add(button1, button2, button3)
-    bot.send_message(message.chat.id, text, reply_markup=kb1)
+    if message.chat.id in get_id_from_black_list():
+        text = 'Вы в черном списке, обратитесь к администратору'
+        bot.reply_to(message, text)
+        starting(message)
+    else:
+        user_id = message.from_user.id
+        text = 'Какой день интересует?'
+        kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
+        button1 = types.KeyboardButton('Сегодня')
+        button2 = types.KeyboardButton('Завтра')
+        button3 = types.KeyboardButton('Другая дата')
+        kb1.add(button1, button2, button3)
+        bot.send_message(message.chat.id, text, reply_markup=kb1)
 
 
 @bot.message_handler(func=lambda message: message.text == 'Сегодня')
 def chek_today_user(message):
-    user_id = message.from_user.id
-    date1 = date.today()
-    day2 = date1.strftime('%d.%m.%Y')
-    start_appoint(message, date1, day2)
+    if message.chat.id in get_id_from_black_list():
+        text = 'Вы в черном списке, обратитесь к администратору'
+        bot.reply_to(message, text)
+        starting(message)
+    else:
+        user_id = message.from_user.id
+        date1 = date.today()
+        day2 = date1.strftime('%d.%m.%Y')
+        start_appoint(message, date1, day2)
 
 
 def check_time_user(message):
@@ -510,18 +539,28 @@ def continue_appoint(message):
 
 @bot.message_handler(func=lambda message: message.text == 'Завтра')
 def chek_tomorrow_user(message):
-    user_id = message.from_user.id
-    date1 = date.today() + timedelta(days=1)
-    day2 = date1.strftime('%d.%m.%Y')
-    start_appoint(message, date1, day2)
+    if message.chat.id in get_id_from_black_list():
+        text = 'Вы в черном списке, обратитесь к администратору'
+        bot.reply_to(message, text)
+        starting(message)
+    else:
+        user_id = message.from_user.id
+        date1 = date.today() + timedelta(days=1)
+        day2 = date1.strftime('%d.%m.%Y')
+        start_appoint(message, date1, day2)
 
 
 @bot.message_handler(func=lambda message: message.text == 'Другая дата')
 # ввод даты после которого последует проверка корректности
 def check_day_input_user(message):
-    text = 'Введи дату в формате дд.мм.гггг.'
-    msg = bot.send_message(message.chat.id, text)
-    bot.register_next_step_handler(msg, check_day_user)
+    if message.chat.id in get_id_from_black_list():
+        text = 'Вы в черном списке, обратитесь к администратору'
+        bot.reply_to(message, text)
+        starting(message)
+    else:
+        text = 'Введи дату в формате дд.мм.гггг.'
+        msg = bot.send_message(message.chat.id, text)
+        bot.register_next_step_handler(msg, check_day_user)
 
 def check_day_user(message):
     text = message.text
@@ -577,17 +616,22 @@ def start_appoint(message, date1, daytext):
 
 @bot.message_handler(func=lambda message: message.text == usergrbt4)
 def get_apoint_user(message):
-    user_id = message.from_user.id
-    appoint = get_my_appoint(user_id)
-    if appoint:
-        day = datetime.strptime(appoint[0], '%Y-%m-%d').strftime('%d.%m.%Y')
-        time1 = appoint[1][0:5]
-        text = f'Ближайшая запись на {day} в {time1}'
+    if message.chat.id in get_id_from_black_list():
+        text = 'Вы в черном списке, обратитесь к администратору'
+        bot.reply_to(message, text)
+        starting(message)
     else:
-        text = 'Нет записей'
-    bot.reply_to(message, text)
-    time.sleep(2)
-    starting(message)
+        user_id = message.from_user.id
+        appoint = get_my_appoint(user_id)
+        if appoint:
+            day = datetime.strptime(appoint[0], '%Y-%m-%d').strftime('%d.%m.%Y')
+            time1 = appoint[1][0:5]
+            text = f'Ближайшая запись на {day} в {time1}'
+        else:
+            text = 'Нет записей'
+        bot.reply_to(message, text)
+        time.sleep(2)
+        starting(message)
 
 
 def confirm_deleted(message):
@@ -603,23 +647,28 @@ def confirm_deleted(message):
 
 @bot.message_handler(func=lambda message: message.text == usergrbt2)
 def ask_change_user_data(message):
-    user_id = message.from_user.id
-    user = get_user_data(user_id)
-    if user:
-        telephone = user[0]
-        name = user[1]
-        text = f'Сейчас вы зарегистрированы под именем\n {name}\n номер телефона:\n {telephone}\nНадо что-то поменять?'
-        kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
-        button1 = types.KeyboardButton('Да')
-        button2 = types.KeyboardButton('Нет')
-        kb1.add(button1, button2)
-        msg = bot.reply_to(message, text, reply_markup=kb1)
-        bot.register_next_step_handler(msg, confirm_userchange)
-    else:
-        text = 'Вы у нас не зарегистрированы'
-        bot.send_message(user_id, text)
-        time.sleep(1)
+    if message.chat.id in get_id_from_black_list():
+        text = 'Вы в черном списке, обратитесь к администратору'
+        bot.reply_to(message, text)
         starting(message)
+    else:
+        user_id = message.from_user.id
+        user = get_user_data(user_id)
+        if user:
+            telephone = user[0]
+            name = user[1]
+            text = f'Сейчас вы зарегистрированы под именем\n {name}\n номер телефона:\n {telephone}\nНадо что-то поменять?'
+            kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
+            button1 = types.KeyboardButton('Да')
+            button2 = types.KeyboardButton('Нет')
+            kb1.add(button1, button2)
+            msg = bot.reply_to(message, text, reply_markup=kb1)
+            bot.register_next_step_handler(msg, confirm_userchange)
+        else:
+            text = 'Вы у нас не зарегистрированы'
+            bot.send_message(user_id, text)
+            time.sleep(1)
+            starting(message)
 
 
 def confirm_userchange(message):
@@ -717,6 +766,144 @@ def choose_deleted(message, appoints):
             delete_apoint_user(message)
 
 
+@bot.message_handler(commands=['help'])
+def help(message):
+    if message.from_user.id in my_user_id:
+        text = ('Команда /start служит для входа в главное меню \nКоманда /admin служит для добавления в список админов '
+            '\nКоманда /black_list для работы с блэк листом')
+    else:
+        text = 'Все команды доступны с главного экрана, для перехода к нему нажмите /start, из любого меню можно выйти введя текст "Отмена или "Выход"'
+    bot.send_message(message.chat.id, text)
+
+
+@bot.message_handler(commands=['black_list'])
+def black_list_start(message):
+    if message.from_user.id in my_user_id:
+        text = f'Что хочешь сделать? \nДобавить в черный список\nПосмотреть черный список\nУдалить из черного списка'
+        kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
+        button1 = types.KeyboardButton('Добавить')
+        button3 = types.KeyboardButton('Посмотеть')
+        button2 = types.KeyboardButton('Изменить')
+        kb1.add(button1, button2, button3)
+        msg = bot.reply_to(message, text, reply_markup=kb1)
+        bot.register_next_step_handler(msg, black_list_second)
+
+
+def black_list_second(message):
+    text = message.text
+    if text in cancel:
+        starting(message)
+    elif text == 'Добавить':
+        kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
+        button1 = types.KeyboardButton('Да')
+        button2 = types.KeyboardButton('Нет')
+        kb1.add(button1, button2)
+        text = 'Есть id? Если есть, то сразу вводи'
+        msg = bot.reply_to(message, text, reply_markup=kb1)
+        bot.register_next_step_handler(msg, add_to_black_list_first)
+    elif text == 'Посмотеть':
+        text = get_black_list_all()
+        bot.send_message(message.chat.id, text)
+        black_list_start(message)
+    elif text == 'Изменить':
+        text = 'Введи id кого хочешь убрать из черного списка'
+        msg = bot.send_message(message.chat.id, text)
+        bot.register_next_step_handler(msg, delete_from_black_list)
+    else:
+        text = 'Неверная команда'
+        msg = bot.send_message(message.chat.id, text)
+        bot.register_next_step_handler(msg, black_list_start)
+
+def delete_from_black_list(message):
+    text = message.text
+    if text in cancel:
+        starting(message)
+    else:
+        try:
+            id = int(text)
+            remove_from_black_list(id)
+            text = 'Сделаноб этого id больше нет в Черном списке'
+            bot.send_message(message.chat.id, text)
+            starting(message)
+        except Exception:
+            text = 'Неверный номер id'
+            msg = bot.send_message(message.chat.id, text)
+            bot.register_next_step_handler(msg, delete_from_black_list)
+
+
+def add_to_black_list_first(message):
+    text = message.text
+    if text in cancel:
+        print('HOW!!!')
+        starting(message)
+    else:
+        if text.isdigit():
+            if add_to_black_list(int(text)):
+                answer = f'Пользователь c id: {text} успешно добавлен в черный список'
+                bot.send_message(message.chat.id, answer)
+                black_list_start(message)
+            else:
+                answer = f'Пользователь с id: {text} не значится в нашей базе'
+                bot.send_message(message.chat.id, answer)
+        elif text == 'Да':
+            answer = f'Введи id'
+            msg = bot.send_message(message.chat.id, answer)
+            bot.register_next_step_handler(msg, add_to_black_list_first)
+        else:
+            text = f'Как будем искать id'
+            kb1 = types.ReplyKeyboardMarkup(one_time_keyboard=True, row_width=2, resize_keyboard=True, )
+            button1 = types.KeyboardButton('По номеру телефона')
+            button3 = types.KeyboardButton('По имени')
+            button2 = types.KeyboardButton('По записи')
+            kb1.add(button1, button2, button3)
+            msg = bot.reply_to(message, text, reply_markup=kb1)
+            bot.register_next_step_handler(msg, add_to_black_list_second)
+
+
+def add_to_black_list_second(message):
+    text = message.text
+    if text in cancel:
+        starting(message)
+    else:
+        if text.isdigit():
+            add_to_black_list_first(message)
+        elif text == 'По номеру телефона':
+            answer = 'Введи номер телефона'
+            msg = bot.reply_to(message, answer)
+            bot.register_next_step_handler(msg, user_search_by_telephon)
+        elif text == 'По имени':
+            answer = 'Введи имя'
+            msg = bot.reply_to(message, answer)
+            bot.register_next_step_handler(msg, user_search_by_name)
+
+
+def user_search_by_telephon(message):
+    text = message.text
+    if text in cancel:
+        black_list_start(message)
+    else:
+        answertext = search_by_telephon(text)
+        if answertext:
+            bot.reply_to(message, answertext)
+            black_list_start(message)
+        else:
+            answer = 'Неверный номер телефона, введи другой'
+            msg = bot.reply_to(message, answertext)
+            bot.register_next_step_handler(msg, user_search_by_telephon)
+
+
+def user_search_by_name(message):
+    text = message.text
+    answertext = search_by_name(text)
+    if answertext:
+        bot.reply_to(message, answertext)
+        black_list_start(message)
+    else:
+        answer = 'Неверный номер телефона, введи другой'
+        msg = bot.reply_to(message, answertext)
+        bot.register_next_step_handler(msg, user_search_by_telephon)
+
+
 @bot.message_handler(func=lambda message: True)
 def echo_message(message):
     global my_user_id
@@ -728,14 +915,6 @@ def echo_message(message):
     bot.reply_to(message, text)
 
 
-@bot.message_handler(commands=['help'])
-def send_any(message):
-    text = 'Команда /start служит для входа в главное меню \nКоманда /admin служит для добавления в список админов'
-    if message.from_user.id == 588726946:
-        bot.send_message(message.chat.id, 'Ты же босс, сам знаешь, что тут делать')
-    else:
-        bot.send_message(message.chat.id, text)
-
 
 def todayapoits_auto():
     usrer = my_user_id[0]
@@ -745,7 +924,6 @@ def todayapoits_auto():
 
 def my_schedule1():
     schedule.every().day.at('07:00').do(todayapoits_auto)
-    schedule.every(1).minutes.do(todayapoits_auto)
     while True:
         try:
             schedule.run_pending()

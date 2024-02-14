@@ -5,7 +5,7 @@ from sqlcommands import (get_next_appoint, get_date_appoint, remuve_weekday, add
                          add_holyday_sql, dalete_holyday_sql, get_worktime_sql, set_worktime, update_worktime, add_user,
                          update_user_sql, create_current_appoint, add_appoint, get_current_appoint, delete_current,
                          get_my_appoint_sql, get_user_data_sql, chenge_user_data_sql, chenge_user_telephone_sql,
-                         delete_erliiest)
+                         delete_erliiest, get_users_from_black_list, get_users_by_tel_sql, get_users_by_name_sql)
 
 weekdays = {
     'Mon': 'Понедельник',
@@ -48,15 +48,12 @@ def date_check(datestr):
     except:
         # days = datestr.split('/', '.', ',',':',';',' ')
         days = re.split("[.,:;]", datestr)
-        print(f'days {days}')
-        print(len(days))
         if len(days) == 2:
             try:
                 thisday = int(days[0])
                 thismonth = int(days[1])
                 thisyear = datetime.today().year
                 thisdate = datetime(thisyear, thismonth, thisday)
-                print(thisdate)
                 return thisdate
             except:
                 return False
@@ -71,6 +68,18 @@ def date_check(datestr):
                 return False
         else:
             return False
+
+
+def telephone_check(tel: str):
+    if len(tel) == 10 and tel.isdigit():
+        return int(tel)
+    elif len(tel) == 11:
+        return telephone_check(tel[1:])
+    elif len(tel) == 12:
+        return telephone_check(tel[2:])
+    else:
+        print('Hier')
+        return False
 
 
 def chek_next_appoint_adm():
@@ -432,6 +441,7 @@ def make_change_user_data(user_id, text):
             update_user_sql(user_id, text)
     return get_user_data(user_id)
 
+
 def check_number(number, max):
     try:
         intnumber = int(number)
@@ -443,3 +453,35 @@ def check_number(number, max):
         return False
 
 
+def get_black_list_all():
+    res = get_users_from_black_list()
+    text = ''
+    for user in res:
+        text += f'Пользователь {user[1]}, Указанный телефон {user[2]}, id: {user[0]}\n'
+    return text
+
+
+def search_by_telephon(tel):
+    telephone = telephone_check(tel)
+    if tel:
+        suser = get_users_by_tel_sql(telephone)
+        if suser:
+            text = f'Найден пользователь {suser[1]}, id: {suser[0]}'
+        else:
+            text = f'Пользователь с номером {tel} не найден'
+        return text
+    else:
+        return False
+
+
+def search_by_name(name):
+    users = get_users_by_name_sql(name)
+    if users:
+        answer = f'Найдено {len(users)} пользователей с именем {name}:\n'
+        for user in users:
+            answer += f'Телефон {user[1]}, id: {user[0]}\n'
+        return answer
+    else:
+        return False
+
+print(search_by_name('vasya'))
